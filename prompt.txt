@@ -1,0 +1,96 @@
+Write a shell script that can call OpenAI.
+
+The script should suppor the following use cases:
+
+  ```bash
+  echo "<prompt here>" | ./gpt.sh # script should support text prompts
+  ```
+
+  ```bash
+  echo "<prompt here>" | ./gpt.sh --image <image> # script should support image prompts
+  ```
+
+  ```bash
+  echo "<prompt here>" --model "gpt-4o-mini" | ./gpt.sh # script should allow user to specify a model
+  ```
+
+This script only needs to hit one endpoint: POST https://api.openai.com/v1/chat/completions
+
+Requests to this endpoint typically look something like this:
+
+
+```bash
+curl https://api.openai.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "What is in this image?"
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+            }
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+The script should check to ensure OPENAI_API_KEY exists before calling the endpoint
+
+The script shold manipulate `.model` and `.messages`. The model should be pulled from user input if specified with a `--model <modelId>` flag. Otherwise, it should default to `gpt-4o-mini`.
+
+The `.messages` array holds an array of `Message` items. The `Message` item itself contains a required `role` and `content`. The `role` for all messages should be `user`. `Content` will contain all the message contents. For text-only inputs, the `content` array will just require one entry ({"type": "text", "text": "prompt goes here..."}). For image-based prompts, `Content` will require both text type and image_url type entries (as you can see in the example above).
+
+Note that images should be provided from the local disk. You should base-64 encode these images and send them as the image_url. A python based example for doing this is below. Note that you can't follow this step for step since you're writing this script for bash.
+
+```python
+import base64
+from openai import OpenAI
+
+client = OpenAI()
+
+# Function to encode the image
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
+# Path to your image
+image_path = "path_to_your_image.jpg"
+
+# Getting the Base64 string
+base64_image = encode_image(image_path)
+
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "What is in this image?",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                },
+            ],
+        }
+    ],
+)
+
+print(response.choices[0])
+```
+
+You should use `jq` to build the payload that will be sent to the endpoint.
