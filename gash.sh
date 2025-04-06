@@ -12,9 +12,6 @@ EOF
 llm() {
 
     set -euo pipefail
-
-
-    
     
     # Check if jq is installed
     if ! command -v jq &> /dev/null
@@ -32,7 +29,6 @@ llm() {
     # Default model
     MODEL="gpt-4o-mini"
     
-    
     # Parse input arguments
     IMAGE_PATH=""
     SHOW_PROMPT=0
@@ -40,7 +36,7 @@ llm() {
       case $1 in
         --image) IMAGE_PATH="$2"; shift ;;
         --model) MODEL="$2"; shift ;;
-        --show--prompt) SHOW_PROMPT=1; shift ;;
+        --show-prompt) SHOW_PROMPT=1; shift ;;
         *) usage ;;
       esac
       shift
@@ -61,12 +57,12 @@ llm() {
       fi
     
       # base64-encode the image
-      BASE64_IMAGE=$(base64 -w 0 "${IMAGE_PATH}")
+      BASE64_IMAGE=$(base64 -w 0 -i "${IMAGE_PATH}")
       IMAGE_URL="data:image/jpeg;base64,${BASE64_IMAGE}"
       echo "$IMAGE_URL" > "$tmp_image_contents"
     fi
     
-    # TODO: ideally we could build the prompt like this
+    # TODO: ideally we could build the prompt like this instead of relying on the conditional
     #jq -n --arg model "$MODEL" --arg prompt "$PROMPT" --arg imagePath "$IMAGE_PATH" --rawfile encodedURL "$tmp_image_contents" '{"model": $model, "messages": [{"role": "user", "content": [{"type": "text", "text": $prompt}] + (if $imagePath | length > 0 then [{"type": "image_url", "image_url": {"url": $encodedURL}}] else [] end)}]}' > "$tmp_payload_contents"
     if [[ -n "$IMAGE_URL" ]]; then
         jq -n --arg model "$MODEL" --rawfile prompt /dev/stdin --rawfile encodedURL "$tmp_image_contents" \
@@ -76,6 +72,7 @@ llm() {
             '{model: $model, messages: [{role: "user", content: [{type: "text", text: $prompt}]}]}' > "$tmp_payload_contents"
     fi
     
+    #cat "$tmp_payload_contents"
     curl https://api.openai.com/v1/chat/completions \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $OPENAI_API_KEY" \
@@ -86,5 +83,5 @@ if [[ "$1" == "--export" ]]; then
     declare -f llm
     declare -p OPENAI_API_KEY
 else
-    llm
+    llm "$@"
 fi
